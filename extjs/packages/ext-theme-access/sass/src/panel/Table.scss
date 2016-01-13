@@ -1,0 +1,7 @@
+@if $include-ext-grid-column-rownumberer
+    or $include-ext-selection-checkboxmodel {
+    // .x-grid-cell-special is used by RowNumberer, CheckboxModel, and RowExpander
+    .#{$prefix}grid-cell-special {
+        background: none;
+    }
+}

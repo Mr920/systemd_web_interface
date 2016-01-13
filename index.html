@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="author" content="Charles Lentz">
+        <meta name="description" content="">
+        <meta name="keywords" content="">
+        <title>SystemD Web Interface</title>
+        <link rel="icon" type="image/png" href="/icons/layout.png">             <!-- requires apache to be setup with that icon redirect thing (this is default on some distros) ( /icons/ is aliased to /usr/share/httpd/icons/ in server config) -->
+        <script type="application/javascript" src="./jquery.min.js"></script>   <!-- I've written the whole "req = new XMLHttpRequest(); req.onreadystatechange = ..." That whole thing that you have to write for EVERY AJAX REQUEST just takes too long. Finally starting to use jquery -->
+        <script type="application/javascript" src='./extjs/ext-all-debug.js'></script>  <!-- heard about the ExtJS library after seeing it used in the Proxmox Web UI. It's pretty impressive. http://i.imgur.com/mqXg6yf.png -->
+        <script type="application/javascript" src='./extjs/ext-theme-neptune-debug.js'></script> 
+        <script type="application/javascript" src='./extjs/DataTip.js'></script> <!-- I think I'm not technically using this one right now. -->
+        <link rel="stylesheet" href="./extjs/ext-theme-neptune-all-debug.css"> 
+        <style type="text/css">
+            html { height: 100%; width: 100%; }
+            body { 
+                height: 100%; 
+                width: 100%;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+
+    </body>
+    <script type="application/javascript">
+                //  http://stackoverflow.com/questions/1960473/unique-values-in-an-array
+                //  http://www.shamasis.net/2009/09/fast-algorithm-to-find-unique-items-in-javascript-array/
+                //  http://jsfiddle.net/46S7g/
+                function toUnique(a,b,c){
+                   b=a.length;
+                   while(c=--b)while(c--)a[b]!==a[c]||a.splice(c,1);
+                   return a
+                }
+    </script>
+    <script type="application/javascript">
+//  My Personal Object
+var clentz = {};
+
+//  Master Function
+//      Nothing should occur outside of this. 
+//      Every single function execution must have a stack trace that originates with the clentz.main(); call
+clentz['main'] = function(){
+    clentz['systemd']      = initialize_systemd_superglobal();
+    clentz['rootPanel']    = createMainPanel();
+    clentz['navPanel']     = clentz.rootPanel.items.items[0];
+    clentz['contentPanel'] = clentz.rootPanel.items.items[1];
+    clentz['unitObjects']  = getUnitData();
+}
+
+//  Do Everything
+clentz.main();
+
+/******************************************************************************************************************/
+/**                                         Function Definitions                                                 **/
+/******************************************************************************************************************/
+
+function initialize_systemd_superglobal(){
+    systemd = {
+        units: {},
+        automount: {},
+        device: {},
+        mount: {},
+        path: {},
+        scope: {},
+        service: {},
+        slice: {},
+        socket: {},
+        swap: {},
+        target: {},
+        timer: {}
+    }
+    return systemd;
+}
+
+function createMainPanel(){
+    var navStore = Ext.create('Ext.data.TreeStore', {
+        proxy: {
+            type: 'ajax',
+            url: './systemd-unit-list.cgi'   /* Don't forget to add "Options +ExecCGI" to your server config. Also think you need to "AddHandler cgi-script .cgi" */
+        },
+        root: {
+            text: 'SystemD Units',
+            id: 'systemd',
+            expanded: true
+        },
+        folderSort: true,
+        sorters: [{
+            property: 'id',
+            direction: 'ASC'
+        }]
+    });
+    return Ext.create('Ext.panel.Panel', {
+        width: '100%',
+        height: '100%',
+        title: '<span style="display: inline-block; width: 50%;">WebApp_Name: SystemD_Interface</span><span style="display: inline-block; width: 50%; text-align: right;">WebApp_Author: Charles_Lentz</span>',
+        layout: 'border',
+        items: [
+           {
+            title: 'Navigation',
+            region:'west',
+            xtype: 'treepanel',
+            margins: '5 0 0 0',
+            width: 250,
+            collapsible: true,
+            id: 'west-region-container',
+            layout: 'fit',
+            store: navStore,
+            resizable: true,
+            listeners: {
+                itemclick: function(s,r) {
+                        if (r.data.text.split('.').length > 1){
+                            console.log('Info: user clicked a SystemD Unit. Calling function:'.concat("\n\tsystemd.units[\"", r.data.text, '"].functions.getLogEntries();', "\n")); 
+                            systemd.units[r.data.text].functions.getLogEntries();
+                        }
+                        else {
+                            console.log('Info: User Clicked SystemD Unit Category:'.concat("\t", r.data.text, ".\tIgnoring Action."));
+                        }
+                }
+            }
+        },{
+            title: '<span style="text-align: center; display: block; width: 100%;">Log Entries</span>',
+            region: 'center',
+            xtype: 'tabpanel',
+            width: '100%',
+            layout: 'fit',
+            margins: '5 0 0 5'
+        }],
+        renderTo: Ext.getBody()
+    });
+}
+
+function getUnitData(){
+    $.getJSON('./systemd-unit-list.cgi', function(ReturnedData){
+        systemd['units'] = {};
+        ReturnedData.forEach(function(sysObj){
+             sysObj.children.forEach(function(sysUnitObj){
+                  var uName = sysUnitObj.text;
+                  var uType = sysUnitObj.unitType;
+                  var uShortName = sysUnitObj.text.split('.'.concat(uType))[0];
+                  var uObj = {uName: uName, uType: uType, uShortName: uShortName};
+                  var myUnitObj = createUnitObject(sysUnitObj, uObj);
+                  systemd[uType][uShortName] = myUnitObj;
+                  systemd.units[uName] = myUnitObj;
+                  // console.log(myUnitObj);
+             });
+        });
+        // console.log(systemd);
+    });
+    return systemd.units;
+}
+
+function createUnitObject(sysUnitObj, uObj){
+    var myUnitObj = {
+        navigationInfo: {
+             id: sysUnitObj.id,
+             text: sysUnitObj.text,
+             leaf: sysUnitObj.leaf
+        },
+        basicInfo: {
+             name: uObj.uShortName,
+             fullname: uObj.uName,
+             type: uObj.uType,
+             description: sysUnitObj.description,
+             active: sysUnitObj.active,
+             load: sysUnitObj.load,
+             sub: sysUnitObj.sub
+        },
+        functions: {
+            list: [ getLogEntries ],
+            getLogEntries: function(){ return getLogEntries(uObj); }
+        }
+    }
+    return myUnitObj;
+}
+
+function getLogEntries(uObj){
+    var uName = uObj.uName;
+    var uType = uObj.uType;
+    var uShortName = uObj.uShortName;
+    var myData = {service: uName, output: 'json-pretty'} // I changed the CGI script to be a lot simpler, since the old one was very fucked up. As such, it is now assuming the user wants JSON output, and is not giving the user a choice in the matter. This object's output property is no longer needed. The ajax POST payload used to be a application/json stringified object. Now its just a sring of the unit name. */
+    var req = $.ajax({
+       url: './systemd-service-status.cgi', /* Don't forget to add "Options +ExecCGI" to your server config. Also think you need to "AddHandler cgi-script .cgi" */
+       type: "POST",
+       contentType: 'text/plain',
+       data: myData.service, 
+       dataType: "json",
+       success: function(Sdata, Sstatus, Sreq){ return logEntryOperations(Sdata, Sstatus, Sreq, uObj); }
+    });
+    return req;
+
+}
+
+function logEntryOperations(retdata, txtStatus, reqObj, uObj){
+    var uType = uObj.uType;
+    var uShortName = uObj.uShortName;
+    var uName = uObj.uName;
+    var detailObj = {
+        RequestObject: reqObj,
+        ReturnedObject: retdata,
+        LogEntries: retdata.Entries,
+        LogFields: function(){
+                                        var fields = [];
+                                        retdata.Entries.forEach(function(entry){
+                                            Object.keys(entry).forEach(function(eKey){
+                                                fields.push(eKey);
+                                            });
+                                        });
+                                        toUnique(fields);
+                                        return fields;
+                   }()
+    }
+    detailObj['gridCols'] = createGridColumns(detailObj.LogFields);
+    systemd[uType][uShortName].detailed = detailObj
+    createLogGrid(uName);
+}
+
+function createGridColumns(fields){
+    var myGridCols = [];
+    fields.sort().forEach(function(Lfield){
+        var gCol = {
+            text: Lfield,
+            // width: 200,
+            sortable: true,
+            dataIndex: Lfield
+        };
+        myGridCols.push(gCol);
+    });
+    return myGridCols;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function createLogGrid(unitName){
+    Ext.define('systemdGridModel', {
+        extend: 'Ext.data.Model',
+        fields: systemd.units[unitName].detailed.LogFields
+    });
+    var systemdGridStore = Ext.create('Ext.data.Store', {
+        model: 'systemdGridModel',
+        data: systemd.units[unitName].detailed.LogEntries
+    });
+    clentz['gridstore'] = systemdGridStore;
+    clentz['gridpanel'] = Ext.create('Ext.grid.Panel', {
+        store: systemdGridStore,
+        width: '100%',
+        height: '100%',
+        title: unitName,
+        stateful: true,
+        multiSelect: true,
+        closable: true,
+        viewConfig: {
+            stripeRows: true,
+            enableTextSelection: true
+        },
+        columns: systemd.units[unitName].detailed.gridCols
+    });
+    //clentz.gridpanel.render(clentz.contentPanel.body.dom);
+    clentz.contentPanel.insert(clentz.gridpanel);
+    //clentz.contentPanel.doLayout();
+}
+    </script>
+</html>
