@@ -7,11 +7,20 @@
         <meta name="description" content="">
         <meta name="keywords" content="">
         <title>SystemD Web Interface</title>
-        <link rel="icon" type="image/png" href="/icons/layout.png">             <!-- requires apache to be setup with that icon redirect thing (this is default on some distros) ( /icons/ is aliased to /usr/share/httpd/icons/ in server config) -->
-        <script type="application/javascript" src="./jquery.min.js"></script>   <!-- I've written the whole "req = new XMLHttpRequest(); req.onreadystatechange = ..." That whole thing that you have to write for EVERY AJAX REQUEST just takes too long. Finally starting to use jquery -->
-        <script type="application/javascript" src='./extjs/ext-all-debug.js'></script>  <!-- heard about the ExtJS library after seeing it used in the Proxmox Web UI. It's pretty impressive. http://i.imgur.com/mqXg6yf.png -->
+        <link rel="icon" type="image/png" href="/icons/layout.png">             <!-- https://httpd.apache.org/docs/2.4/mod/mod_alias.html#alias -->
+        <script type="application/javascript" src="./jquery.min.js"></script>   <!-- using jQuery to cut down on typing involved for ajax requests -->
+        
+        <!--
+            http://docs.sencha.com/extjs/4.2.5/extjs-build/examples/build/KitchenSink/ext-theme-neptune/#tree-two
+            http://docs.sencha.com/extjs/4.2.5/extjs-build/examples/layout-browser/layout-browser.html#treeview-1011-record-border
+            http://docs.sencha.com/extjs/4.2.5/#!/api/Ext.tab.Tab
+            http://docs.sencha.com/downloads/extjs-docs-4.2.4.zip
+            You can get the ExtJS Library Files within the contents of the documentation directories. 
+        -->
+        <script type="application/javascript" src='./extjs/ext-all-debug.js'></script>
         <script type="application/javascript" src='./extjs/ext-theme-neptune-debug.js'></script> 
         <script type="application/javascript" src='./extjs/DataTip.js'></script> <!-- I think I'm not technically using this one right now. -->
+
         <link rel="stylesheet" href="./extjs/ext-theme-neptune-all-debug.css"> 
         <style type="text/css">
             html { height: 100%; width: 100%; }
